@@ -7,7 +7,7 @@ Trabajo Práctico Integrador · Programación 4 · Tecnicatura Universitaria en 
 | | |
 |---|---|
 | 📦 Repositorio | **https://github.com/Nicolasdemiryi/food-store**
-| 🎥 Video de demostración | **https://…**
+| 🎥 Video de demostración | **https://drive.google.com/file/d/1BdedxYMdsa_9Ne80Y3DrsyDXIYKqcQEr/view?usp=sharing**
 
 Aplicación web para un negocio de comidas.
 
