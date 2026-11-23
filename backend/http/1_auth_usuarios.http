@@ -1,0 +1,91 @@
+# Auth y usuarios. REST Client guarda la cookie del login y la reenvía sola.
+# Correr en orden con la base recién cargada por:  python -m app.db.seed
+
+@base = http://localhost:8000/api/v1
+
+### 1. /me sin sesión — Esperado: 401
+GET {{base}}/auth/me
+
+### 2. Registro público (rol user) — Esperado: 201
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{ "username": "nico", "full_name": "Nicolás Demiryi", "email": "nico@mail.com", "password": "Nico1234!" }
+
+### 3. username repetido — Esperado: 409
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{ "username": "nico", "full_name": "Otro", "email": "otro@mail.com", "password": "Nico1234!" }
+
+### 4. email repetido — Esperado: 409
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{ "username": "otro", "full_name": "Otro", "email": "NICO@mail.com", "password": "Nico1234!" }
+
+### 5. Contraseña corta y email inválido — Esperado: 422
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{ "username": "x1", "full_name": "X", "email": "no-es-email", "password": "corta" }
+
+### 6. Login con contraseña incorrecta — Esperado: 401
+POST {{base}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=nico&password=incorrecta
+
+### 7. Login correcto: cookie HttpOnly, el cuerpo NO trae el token — Esperado: 200
+POST {{base}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=nico&password=Nico1234!
+
+### 8. Perfil — Esperado: 200
+GET {{base}}/auth/me
+
+### 9. user en una ruta de admin — Esperado: 403
+GET {{base}}/admin/usuarios
+
+### 10. Logout — Esperado: 200
+POST {{base}}/auth/logout
+
+### 11. /me después del logout — Esperado: 401
+GET {{base}}/auth/me
+
+### 12. Login como admin — Esperado: 200
+POST {{base}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=admin&password=Admin1234!
+
+### 13. Listado de usuarios — Esperado: 200
+GET {{base}}/admin/usuarios
+
+### 14. El admin no puede desactivarse a sí mismo — Esperado: 400
+POST {{base}}/admin/usuarios/1/desactivar
+
+### 15. Usuario inexistente — Esperado: 404
+POST {{base}}/admin/usuarios/999/activar
+
+### 16. Desactivar a nico (id 3) — Esperado: 200
+POST {{base}}/admin/usuarios/3/desactivar
+
+### 17. Idempotente: desactivar otra vez — Esperado: 200
+POST {{base}}/admin/usuarios/3/desactivar
+
+### 18. Login de una cuenta desactivada — Esperado: 400
+POST {{base}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=nico&password=Nico1234!
+
+### 19. Login como admin otra vez — Esperado: 200
+POST {{base}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=admin&password=Admin1234!
+
+### 20. Activar a nico — Esperado: 200
+POST {{base}}/admin/usuarios/3/activar

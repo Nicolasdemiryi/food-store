@@ -1,0 +1,164 @@
+# Pedidos: RN-01 a RN-06. Correr después de los anteriores (usa los productos del seed).
+# Producto 10 = Flan (stock 10) · Producto 11 = Brownie (stock 8) · Producto 1 = Pizza muzzarella (stock 20)
+
+@base = http://localhost:8000/api/v1
+
+### 0. Login como cliente — Esperado: 200
+POST {{base}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=cliente&password=Cliente1234!
+
+### 1. Crear pedido: descuenta stock y copia nombre y precio — Esperado: 201
+# @name p1
+POST {{base}}/pedidos
+Content-Type: application/json
+
+{
+  "items": [ { "producto_id": 10, "cantidad": 3 }, { "producto_id": 1, "cantidad": 2 } ],
+  "forma_pago": "EFECTIVO",
+  "direccion_entrega": "Av. Colón 1234, Córdoba",
+  "notas": "Tocar timbre 2B"
+}
+
+### 2. Stock del Flan: 10 - 3 = 7 — Esperado: 200
+GET {{base}}/productos/10
+
+### 3. Stock insuficiente en el 2.º ítem: NO se persiste nada (rollback) — Esperado: 400
+POST {{base}}/pedidos
+Content-Type: application/json
+
+{ "items": [ { "producto_id": 10, "cantidad": 1 }, { "producto_id": 11, "cantidad": 999 } ], "forma_pago": "EFECTIVO", "direccion_entrega": "Calle Falsa 123" }
+
+### 4. El Flan sigue en 7 (no se descontó el ítem anterior) — Esperado: 200
+GET {{base}}/productos/10
+
+### 5. Producto repetido — Esperado: 400
+POST {{base}}/pedidos
+Content-Type: application/json
+
+{ "items": [ { "producto_id": 1, "cantidad": 1 }, { "producto_id": 1, "cantidad": 2 } ], "forma_pago": "EFECTIVO", "direccion_entrega": "Calle Falsa 123" }
+
+### 6. Producto inexistente — Esperado: 404
+POST {{base}}/pedidos
+Content-Type: application/json
+
+{ "items": [ { "producto_id": 999, "cantidad": 1 } ], "forma_pago": "EFECTIVO", "direccion_entrega": "Calle Falsa 123" }
+
+### 7. Producto dado de baja (el combo de 2_catalogo.http) — Esperado: 404
+POST {{base}}/pedidos
+Content-Type: application/json
+
+{ "items": [ { "producto_id": 12, "cantidad": 1 } ], "forma_pago": "EFECTIVO", "direccion_entrega": "Calle Falsa 123" }
+
+### 8. Forma de pago inválida y dirección corta (RN-06) — Esperado: 422
+POST {{base}}/pedidos
+Content-Type: application/json
+
+{ "items": [ { "producto_id": 1, "cantidad": 1 } ], "forma_pago": "TARJETA", "direccion_entrega": "abc" }
+
+### 9. Sin ítems — Esperado: 422
+POST {{base}}/pedidos
+Content-Type: application/json
+
+{ "items": [], "forma_pago": "EFECTIVO", "direccion_entrega": "Calle Falsa 123" }
+
+### 10. Segundo pedido (para cancelar) — Esperado: 201
+# @name p2
+POST {{base}}/pedidos
+Content-Type: application/json
+
+{ "items": [ { "producto_id": 11, "cantidad": 2 } ], "forma_pago": "TRANSFERENCIA", "direccion_entrega": "San Martín 50, Córdoba" }
+
+### 11. Mis pedidos (paginado) — Esperado: 200
+GET {{base}}/pedidos?skip=0&limit=10
+
+### 12. El cliente no ve el resumen — Esperado: 403
+GET {{base}}/pedidos/resumen
+
+### 13. El dueño cancela su pedido PENDIENTE: restituye stock (RN-03) — Esperado: 200
+PATCH {{base}}/pedidos/{{p2.response.body.$.id}}/cancelar
+
+### 14. Brownie vuelve a 8 — Esperado: 200
+GET {{base}}/productos/11
+
+### 15. Cancelar otra vez: ya no está PENDIENTE — Esperado: 400
+PATCH {{base}}/pedidos/{{p2.response.body.$.id}}/cancelar
+
+### 16. El cliente no puede cambiar estados — Esperado: 403
+PATCH {{base}}/pedidos/{{p1.response.body.$.id}}/estado
+Content-Type: application/json
+
+{ "estado": "EN_PREPARACION" }
+
+### 17. Login como nico (otro user) — Esperado: 200
+POST {{base}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=nico&password=Nico1234!
+
+### 18. Pedido ajeno: detalle — Esperado: 403
+GET {{base}}/pedidos/{{p1.response.body.$.id}}
+
+### 19. Pedido ajeno: cancelar — Esperado: 403
+PATCH {{base}}/pedidos/{{p1.response.body.$.id}}/cancelar
+
+### 20. Login como admin — Esperado: 200
+POST {{base}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=admin&password=Admin1234!
+
+### 21. Todos los pedidos, filtrados por estado — Esperado: 200
+GET {{base}}/pedidos?estado=PENDIENTE
+
+### 22. Estado inválido en el filtro — Esperado: 422
+GET {{base}}/pedidos?estado=PERDIDO
+
+### 23. Salto inválido: PENDIENTE → ENTREGADO — Esperado: 400
+PATCH {{base}}/pedidos/{{p1.response.body.$.id}}/estado
+Content-Type: application/json
+
+{ "estado": "ENTREGADO" }
+
+### 24. PENDIENTE → EN_PREPARACION — Esperado: 200
+PATCH {{base}}/pedidos/{{p1.response.body.$.id}}/estado
+Content-Type: application/json
+
+{ "estado": "EN_PREPARACION" }
+
+### 25. EN_PREPARACION → ENTREGADO — Esperado: 200
+PATCH {{base}}/pedidos/{{p1.response.body.$.id}}/estado
+Content-Type: application/json
+
+{ "estado": "ENTREGADO" }
+
+### 26. ENTREGADO es terminal — Esperado: 400
+PATCH {{base}}/pedidos/{{p1.response.body.$.id}}/estado
+Content-Type: application/json
+
+{ "estado": "CANCELADO" }
+
+### 27. Estado que no existe — Esperado: 422
+PATCH {{base}}/pedidos/{{p1.response.body.$.id}}/estado
+Content-Type: application/json
+
+{ "estado": "PERDIDO" }
+
+### 28. Pedido inexistente — Esperado: 404
+GET {{base}}/pedidos/999
+
+### 29. Resumen: 1 entregado (ingresos 28.600), 1 cancelado — Esperado: 200
+GET {{base}}/pedidos/resumen
+
+### 30. El precio del producto cambia… — Esperado: 200
+PUT {{base}}/productos/1
+Content-Type: application/json
+
+{ "precio_base": 99999 }
+
+### 31. …pero el pedido conserva su precio y su total (RN-05) — Esperado: 200
+GET {{base}}/pedidos/{{p1.response.body.$.id}}
+
+### 32. No hay endpoint para borrar pedidos — Esperado: 405
+DELETE {{base}}/pedidos/{{p1.response.body.$.id}}

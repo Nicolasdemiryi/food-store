@@ -1,0 +1,140 @@
+# Categorías y productos. Lecturas públicas; escrituras solo admin. Correr después de 1_auth_usuarios.http.
+
+@base = http://localhost:8000/api/v1
+
+### 0. Cerrar sesión previa — Esperado: 200
+POST {{base}}/auth/logout
+
+### 1. Categorías activas (público) — Esperado: 200
+GET {{base}}/categorias
+
+### 2. Productos paginados (público) — Esperado: 200
+GET {{base}}/productos?skip=0&limit=5
+
+### 3. Búsqueda sin distinguir mayúsculas + filtro por categoría — Esperado: 200
+GET {{base}}/productos?search=PIZZA&categoria_id=1
+
+### 4. limit fuera de rango (máximo 100) — Esperado: 422
+GET {{base}}/productos?limit=500
+
+### 5. Detalle con su categoría — Esperado: 200
+GET {{base}}/productos/1
+
+### 6. Crear sin sesión — Esperado: 401
+POST {{base}}/categorias
+Content-Type: application/json
+
+{ "nombre": "Sushi" }
+
+### 7. Login como cliente — Esperado: 200
+POST {{base}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=cliente&password=Cliente1234!
+
+### 8. user intenta crear — Esperado: 403
+POST {{base}}/categorias
+Content-Type: application/json
+
+{ "nombre": "Sushi" }
+
+### 9. Login como admin — Esperado: 200
+POST {{base}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=admin&password=Admin1234!
+
+### 10. Crear categoría — Esperado: 201
+# @name cat
+POST {{base}}/categorias
+Content-Type: application/json
+
+{ "nombre": "Sushi", "descripcion": "Rolls y nigiris" }
+
+### 11. Nombre repetido (sin distinguir mayúsculas) — Esperado: 409
+POST {{base}}/categorias
+Content-Type: application/json
+
+{ "nombre": "PIZZAS" }
+
+### 12. Nombre de 1 carácter — Esperado: 422
+POST {{base}}/categorias
+Content-Type: application/json
+
+{ "nombre": "X" }
+
+### 13. PUT parcial: solo la descripción — Esperado: 200
+PUT {{base}}/categorias/{{cat.response.body.$.id}}
+Content-Type: application/json
+
+{ "descripcion": "Rolls, nigiris y combinados" }
+
+### 14. Crear producto en la nueva categoría — Esperado: 201
+# @name prod
+POST {{base}}/productos
+Content-Type: application/json
+
+{ "nombre": "Combo 15 piezas", "precio_base": 14500, "stock": 5, "categoria_id": {{cat.response.body.$.id}} }
+
+### 15. Precio negativo — Esperado: 422
+POST {{base}}/productos
+Content-Type: application/json
+
+{ "nombre": "X", "precio_base": -1, "categoria_id": 1 }
+
+### 16. Categoría inexistente — Esperado: 404
+POST {{base}}/productos
+Content-Type: application/json
+
+{ "nombre": "X", "precio_base": 100, "categoria_id": 999 }
+
+### 17. PUT parcial: solo el precio — Esperado: 200
+PUT {{base}}/productos/{{prod.response.body.$.id}}
+Content-Type: application/json
+
+{ "precio_base": 15000 }
+
+### 18. PATCH de stock y disponibilidad — Esperado: 200
+PATCH {{base}}/productos/{{prod.response.body.$.id}}/stock
+Content-Type: application/json
+
+{ "stock": 9, "disponible": false }
+
+### 19. Stock negativo — Esperado: 422
+PATCH {{base}}/productos/{{prod.response.body.$.id}}/stock
+Content-Type: application/json
+
+{ "stock": -3 }
+
+### 20. Baja lógica de la categoría — Esperado: 204
+DELETE {{base}}/categorias/{{cat.response.body.$.id}}
+
+### 21. Categoría dada de baja = inexistente — Esperado: 404
+GET {{base}}/categorias/{{cat.response.body.$.id}}
+
+### 22. La baja NO libera el nombre — Esperado: 409
+POST {{base}}/categorias
+Content-Type: application/json
+
+{ "nombre": "Sushi" }
+
+### 23. Crear producto en una categoría dada de baja — Esperado: 404
+POST {{base}}/productos
+Content-Type: application/json
+
+{ "nombre": "X", "precio_base": 100, "categoria_id": {{cat.response.body.$.id}} }
+
+### 24. La baja de la categoría NO oculta sus productos — Esperado: 200
+GET {{base}}/productos/{{prod.response.body.$.id}}
+
+### 25. Baja lógica del producto — Esperado: 204
+DELETE {{base}}/productos/{{prod.response.body.$.id}}
+
+### 26. Producto dado de baja: detalle — Esperado: 404
+GET {{base}}/productos/{{prod.response.body.$.id}}
+
+### 27. Producto dado de baja: PUT — Esperado: 404
+PUT {{base}}/productos/{{prod.response.body.$.id}}
+Content-Type: application/json
+
+{ "precio_base": 1 }

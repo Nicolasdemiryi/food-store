@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* Tokens de diseño: cada --color-<nombre> genera bg-<nombre>, text-<nombre>, border-<nombre>… */
+@theme {
+  --color-brand: #ea580c;
+  --color-brand-hover: #c2410c;
+  --color-brand-soft: #fff7ed;
+  --color-success: #16a34a;
+  --color-error: #dc2626;
+}
+
+body {
+  @apply bg-stone-50 text-stone-900 antialiased;
+}
